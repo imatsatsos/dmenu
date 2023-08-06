@@ -7,10 +7,10 @@ static const int vertpad = 4;              /* vertical padding of bar */
 static const int sidepad = 2;              /* horizontal padding of bar */
 /* -fn option overrides fonts[0]; default X11 font or font set */
 static const char *fonts[] =
-{
-	"sans:size=11",
-  "Noto Color Emoji:size=11"
-};
+	{
+		"sans:size=11",
+		"Noto Color Emoji:size=11"
+	};
 static const char *prompt      = NULL;      /* -p  option; prompt to the left of input field */
 
 
