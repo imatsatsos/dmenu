@@ -9,6 +9,7 @@ static const int sidepad = 2;              /* horizontal padding of bar */
 static const char *fonts[] =
 	{
 		"sans:size=11",
+		"Symbols Nerd Font Mono:size=11",
 		"Noto Color Emoji:size=11"
 	};
 static const char *prompt      = NULL;      /* -p  option; prompt to the left of input field */
