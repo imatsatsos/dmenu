@@ -5,18 +5,19 @@ and [flexipatch-finalizer](https://github.com/bakkeby/flexipatch-finalizer).
 
 ## Build & install
 Install dependencies:  
-```libXft-devel libXinerama-devel fontconfig-devel```
+```libX11-devel libXft-devel libXinerama-devel```
 
 Build and install:  
 ```make install```
 
-### Patches
-- BARPADDING
+### Patches:
+- ALPHA
 - BORDER
+- CENTER
 - FUZZYMATCH
 - FUZZYHIGHLIGHT
 - GRID
-- GRIDNAV
+- GRID_NAV
 - LINE_HEIGHT
 - VERTFULL
 - XYW

@@ -27,6 +27,8 @@
                              * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
 #define LENGTH(X)             (sizeof X / sizeof X[0])
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
+#define OPAQUE                0xffU
+#define OPACITY               "_NET_WM_WINDOW_OPACITY"
 
 /* enums */
 enum {
@@ -53,8 +55,6 @@ static int dmx = 0, dmy = 0; /* put dmenu at these x and y offsets */
 static unsigned int dmw = 0; /* make dmenu this wide */
 static int inputw = 0, promptw;
 static int lrpad; /* sum of left and right padding */
-static int vp; /* vertical padding for bar */
-static int sp; /* side padding for bar */
 static size_t cursor;
 static struct item *items = NULL;
 static struct item *matches, *matchend;
@@ -66,6 +66,10 @@ static Display *dpy;
 static Window root, parentwin, win;
 static XIC xic;
 
+static int useargb = 0;
+static Visual *visual;
+static int depth;
+static Colormap cmap;
 
 static Drw *drw;
 static Clr *scheme[SchemeLast];
@@ -98,6 +102,7 @@ static size_t nextrune(int inc);
 static void movewordedge(int dir);
 static void keypress(XKeyEvent *ev);
 static void paste(void);
+static void xinitvisual(void);
 static void readstdin(void);
 static void run(void);
 static void setup(void);
@@ -669,6 +674,42 @@ paste(void)
 	drawmenu();
 }
 
+static void
+xinitvisual()
+{
+	XVisualInfo *infos;
+	XRenderPictFormat *fmt;
+	int nitems;
+	int i;
+
+	XVisualInfo tpl = {
+		.screen = screen,
+		.depth = 32,
+		.class = TrueColor
+	};
+	long masks = VisualScreenMask | VisualDepthMask | VisualClassMask;
+
+	infos = XGetVisualInfo(dpy, masks, &tpl, &nitems);
+	visual = NULL;
+	for(i = 0; i < nitems; i ++) {
+		fmt = XRenderFindVisualFormat(dpy, infos[i].visual);
+		if (fmt->type == PictTypeDirect && fmt->direct.alphaMask) {
+			visual = infos[i].visual;
+			depth = infos[i].depth;
+			cmap = XCreateColormap(dpy, root, visual, AllocNone);
+			useargb = 1;
+			break;
+		}
+	}
+
+	XFree(infos);
+
+	if (!visual || !opacity) {
+		visual = DefaultVisual(dpy, screen);
+		depth = DefaultDepth(dpy, screen);
+		cmap = DefaultColormap(dpy, screen);
+	}
+}
 
 static void
 readstdin(void)
@@ -755,7 +796,7 @@ setup(void)
 #endif
 	/* init appearance */
 	for (j = 0; j < SchemeLast; j++)
-		scheme[j] = drw_scm_create(drw, colors[j], 2);
+		scheme[j] = drw_scm_create(drw, colors[j], alphas[j], 2);
 
 	clip = XInternAtom(dpy, "CLIPBOARD",   False);
 	utf8 = XInternAtom(dpy, "UTF8_STRING", False);
@@ -765,6 +806,7 @@ setup(void)
 	bh = MAX(bh,lineheight);	/* make a menu line AT LEAST 'lineheight' tall */
 	lines = MAX(lines, 0);
 	mh = (lines + 1) * bh;
+	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 #ifdef XINERAMA
 	i = 0;
 	if (parentwin == root && (info = XineramaQueryScreens(dpy, &n))) {
@@ -791,9 +833,15 @@ setup(void)
 				if (INTERSECT(x, y, 1, 1, info[i]) != 0)
 					break;
 
-		x = info[i].x_org + dmx;
-		y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
-		mw = (dmw>0 ? dmw : info[i].width);
+		if (center) {
+			mw = MIN(MAX(max_textw() + promptw, min_width), info[i].width);
+			x = info[i].x_org + ((info[i].width  - mw) / 2);
+			y = info[i].y_org + ((info[i].height - mh) / 2);
+		} else {
+			x = info[i].x_org + dmx;
+			y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
+			mw = (dmw>0 ? dmw : info[i].width);
+		}
 		XFree(info);
 	} else
 #endif
@@ -801,24 +849,30 @@ setup(void)
 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
 			die("could not get embedding window attributes: 0x%lx",
 			    parentwin);
-		x = dmx;
-		y = topbar ? dmy : wa.height - mh - dmy;
-		mw = (dmw>0 ? dmw : wa.width);
+		if (center) {
+			mw = MIN(MAX(max_textw() + promptw, min_width), wa.width);
+			x = (wa.width  - mw) / 2;
+			y = (wa.height - mh) / 2;
+		} else {
+			x = dmx;
+			y = topbar ? dmy : wa.height - mh - dmy;
+			mw = (dmw>0 ? dmw : wa.width);
+		}
 	}
-	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 	inputw = mw / 3; /* input width: ~33.33% of monitor width */
 	match();
 
 	/* create menu window */
 	swa.override_redirect = True;
-	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
+	swa.background_pixel = 0;
+	swa.colormap = cmap;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask
 	;
 	win = XCreateWindow(
 		dpy, root,
-		x + sp, y + vp - (topbar ? 0 : border_width * 2), mw - 2 * sp - border_width * 2, mh, border_width,
-		CopyFromParent, CopyFromParent, CopyFromParent,
-		CWOverrideRedirect | CWBackPixel | CWEventMask, &swa
+		x, y - (topbar ? 0 : border_width * 2), mw - border_width * 2, mh, border_width,
+		depth, InputOutput, visual,
+		CWOverrideRedirect|CWBackPixel|CWBorderPixel|CWColormap|CWEventMask, &swa
 	);
 	if (border_width)
 		XSetWindowBorder(dpy, win, scheme[SchemeBorder][ColBg].pixel);
@@ -852,6 +906,7 @@ static void
 usage(void)
 {
 	die("usage: dmenu [-bv"
+		"c"
 		"f"
 		"i"
 		"F"
@@ -860,6 +915,7 @@ usage(void)
 		"[-l lines] [-p prompt] [-fn font] [-m monitor]"
 		"\n             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]"
 		"\n            "
+		" [-o opacity]"
 		" [-bw width]"
 		"\n            "
 		" [-h height]"
@@ -886,6 +942,8 @@ main(int argc, char *argv[])
 			exit(0);
 		} else if (!strcmp(argv[i], "-b")) { /* appears at the bottom of the screen */
 			topbar = 0;
+		} else if (!strcmp(argv[i], "-c")) { /* toggles centering of dmenu window on screen */
+			center = !center;
 		} else if (!strcmp(argv[i], "-f")) { /* grabs keyboard before reading stdin */
 			fast = 1;
 		} else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
@@ -911,6 +969,8 @@ main(int argc, char *argv[])
 			dmw = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-m"))
 			mon = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "-o"))  /* opacity, pass -o 0 to disable alpha */
+			opacity = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
 			prompt = argv[++i];
 		else if (!strcmp(argv[i], "-fn"))  /* font or font set */
@@ -956,15 +1016,14 @@ main(int argc, char *argv[])
 		die("could not get embedding window attributes: 0x%lx",
 		    parentwin);
 
-	drw = drw_create(dpy, screen, root, wa.width, wa.height);
+	xinitvisual();
+	drw = drw_create(dpy, screen, root, wa.width, wa.height, visual, depth, cmap);
 
 	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
 		die("no fonts could be loaded.");
 
 	lrpad = drw->fonts->h;
 
-	sp = sidepad;
-	vp = (topbar ? vertpad : - vertpad);
 
 	if (lineheight == -1)
 		lineheight = drw->fonts->h * 2.5;

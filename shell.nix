@@ -2,10 +2,8 @@
   pkgs.mkShell {
     nativeBuildInputs = with pkgs; [
       gnumake
-      xorg.libX11.dev
-      xorg.libXft.dev
-      xorg.libXinerama.dev
-      fontconfig.dev
-      freetype.dev
+      xorg.libX11
+      xorg.libXft
+      xorg.libXinerama
     ];
 }
