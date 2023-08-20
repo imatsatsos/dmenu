@@ -1,5 +1,11 @@
 /* See LICENSE file for copyright and license details. */
 /* Default settings; can be overriden by command line. */
+#define wal "/home/john/.cache/wal/colors-wal-dmenu-colorscheme.h"
+#if __has_include(wal)
+#include wal
+#else
+#include "colorscheme.h"
+#endif
 
 static int topbar = 1;                      /* -b  option; if 0, dmenu appears at bottom */
 static int opacity = 1;                     /* -o  option; if 0, then alpha is disabled */
@@ -26,22 +32,20 @@ static const unsigned int alphas[][3]      = {
 	[SchemeNormHighlight] = { OPAQUE, baralpha, borderalpha },
 };
 
-static
-const
-char *colors[][2] = {
-	/*               fg         bg       */
-	[SchemeNorm] = { "#dddddd", "#0c0e0f" },
-	[SchemeSel]  = { "#0c0e0f", "#5a84bc" },
-	[SchemeOut]  = { "#000000", "#00ffff" },
-	[SchemeBorder] = { "#000000", "#5a84bc" },
-	[SchemeSelHighlight]  = { "#e79881", "#5a84bc" },
-	[SchemeNormHighlight] = { "#67afc1", "#0c0e0f" },
+static const char *colors[][2] = {
+	/*                        fg         bg        */
+	[SchemeNorm]          = { nor_fg,    nor_bg },
+	[SchemeSel]           = { sel_fg,    sel_bg },
+	[SchemeOut]           = { "#000000", "#00ffff" },
+	[SchemeBorder]        = { "#000000", brd },
+	[SchemeSelHighlight]  = { sel_hl_fg, sel_hl_bg },
+	[SchemeNormHighlight] = { nor_hl_fg, nor_hl_bg },
 };
 /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
 static unsigned int lines      = 0;
 /* -g option; if nonzero, dmenu uses a grid comprised of columns and lines */
 static unsigned int columns    = 0;
-static unsigned int lineheight = 31;         /* -h option; minimum height of a menu line     */
+static unsigned int lineheight = 32;         /* -h option; minimum height of a menu line     */
 static unsigned int min_lineheight = 8;
 
 /*

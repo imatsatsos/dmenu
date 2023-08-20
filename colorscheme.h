@@ -1,0 +1,9 @@
+static const char nor_fg[]    = "#dddddd";
+static const char nor_bg[]    = "#0b0d0e";
+static const char sel_fg[]    = "#0b0d0e";
+static const char sel_bg[]    = "#6791c9";
+static const char brd[]       = "#6791c9";
+static const char nor_hl_fg[] = "#67afc1";
+static const char nor_hl_bg[] = "#0b0d0e";
+static const char sel_hl_fg[] = "#e79881";
+static const char sel_hl_bg[] = "#6791c9";
